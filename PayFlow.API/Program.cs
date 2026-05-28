@@ -1,11 +1,17 @@
 using PayFlow.API.Services;
 using PayFlow.API.Middleware;
+using Microsoft.EntityFrameworkCore;
+using PayFlow.API.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services
 builder.Services.AddControllers();
-builder.Services.AddSingleton<IDataRepository, InMemoryDataRepository>();
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+});
+builder.Services.AddScoped<IDataRepository, EfDataRepository>();
 builder.Services.AddScoped<ISellerService, SellerService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
@@ -34,5 +40,11 @@ app.MapControllers();
 // Health check endpoints
 app.MapGet("/", () => "PayFlow API - Ready to accept requests from frontend");
 app.MapGet("/api/health", () => new { status = "ok", timestamp = DateTime.UtcNow });
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
 
 app.Run();
