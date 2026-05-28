@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PayFlow.API.Services;
+using PayFlow.API.DTOs.Requests;
 
 namespace PayFlow.API.Controllers;
 
@@ -19,5 +20,19 @@ public class CategoriesController : ControllerBase
     {
         var categories = _categoryService.GetCategories();
         return Ok(categories);
+    }
+
+    [HttpPost]
+    public IActionResult CreateCategory([FromBody] SaveCategoryRequest request)
+    {
+        var category = _categoryService.CreateCategory(request);
+        return CreatedAtAction(nameof(GetCategories), new { id = category.Id }, category);
+    }
+
+    [HttpPut("{id}")]
+    public IActionResult UpdateCategory(Guid id, [FromBody] SaveCategoryRequest request)
+    {
+        var category = _categoryService.UpdateCategory(id, request);
+        return Ok(category);
     }
 }

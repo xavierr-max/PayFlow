@@ -26,9 +26,16 @@ public class ProductService : IProductService
 
     public ProductResponse CreateProduct(Guid sellerId, CreateProductRequest request)
     {
-        var product = new Product(request.Name, request.Description, request.Price, request.Quantity, sellerId);
+        var product = new Product(
+            request.Name,
+            request.Description ?? "",
+            request.Price,
+            request.Quantity,
+            sellerId,
+            request.CategoryId ?? "",
+            request.ImageUrl ?? "");
         _repository.AddProduct(product);
-        return MapToResponse(product, request.CategoryId, request.ImageUrl);
+        return MapToResponse(product);
     }
 
     public ProductResponse GetProduct(Guid id)
@@ -37,20 +44,20 @@ public class ProductService : IProductService
         if (product == null)
             throw new NotFoundException($"Product with ID {id} not found");
 
-        return MapToResponse(product, "", "");
+        return MapToResponse(product);
     }
 
     public List<ProductResponse> GetProductsBySeller(Guid sellerId)
     {
         var products = _repository.GetProductsBySeller(sellerId);
-        return products.Select(p => MapToResponse(p, "", "")).ToList();
+        return products.Select(MapToResponse).ToList();
     }
 
     public List<ProductResponse> GetProductsByCategory(Guid sellerId, string categoryId)
     {
         var products = _repository.GetProductsBySeller(sellerId);
         return products
-            .Select(p => MapToResponse(p, categoryId, ""))
+            .Select(MapToResponse)
             .Where(p => p.CategoryId == categoryId)
             .ToList();
     }
@@ -61,9 +68,15 @@ public class ProductService : IProductService
         if (product == null)
             throw new NotFoundException($"Product with ID {id} not found");
 
-        product.Update(request.Name, request.Description, request.Price, request.Quantity);
+        product.Update(
+            request.Name,
+            request.Description ?? "",
+            request.Price,
+            request.Quantity,
+            request.CategoryId ?? "",
+            request.ImageUrl ?? "");
         _repository.UpdateProduct(product);
-        return MapToResponse(product, request.CategoryId, request.ImageUrl);
+        return MapToResponse(product);
     }
 
     public void DeleteProduct(Guid id)
@@ -75,7 +88,7 @@ public class ProductService : IProductService
         _repository.DeleteProduct(id);
     }
 
-    private static ProductResponse MapToResponse(Product product, string categoryId, string imageUrl)
+    private static ProductResponse MapToResponse(Product product)
     {
         return new ProductResponse
         {
@@ -85,8 +98,8 @@ public class ProductService : IProductService
             Price = product.Price,
             Quantity = product.Quantity,
             SellerId = product.SellerId,
-            CategoryId = categoryId,
-            ImageUrl = imageUrl
+            CategoryId = product.CategoryId,
+            ImageUrl = product.ImageUrl
         };
     }
 }

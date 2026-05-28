@@ -5,6 +5,8 @@ namespace PayFlow.Domain.Billing.Entities;
 /// </summary>
 public class PaymentItem
 {
+    protected PaymentItem() { }
+
     public PaymentItem(Guid productId, Guid paymentId, int quantity, decimal unitPrice)
     {
         if (quantity <= 0)

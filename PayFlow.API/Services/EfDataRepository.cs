@@ -37,6 +37,20 @@ public class EfDataRepository : IDataRepository
         }
     }
 
+    // Categories
+    public List<Category> GetCategories() => _context.Categories.OrderBy(c => c.Name).ToList();
+    public Category? GetCategory(Guid id) => _context.Categories.Find(id);
+    public void AddCategory(Category category)
+    {
+        _context.Categories.Add(category);
+        _context.SaveChanges();
+    }
+    public void UpdateCategory(Category category)
+    {
+        _context.Categories.Update(category);
+        _context.SaveChanges();
+    }
+
     // Products
     public List<Product> GetProductsBySeller(Guid sellerId) => _context.Products.Where(p => p.SellerId == sellerId).ToList();
     public Product? GetProduct(Guid id) => _context.Products.Find(id);
@@ -115,5 +129,14 @@ public class EfDataRepository : IDataRepository
             _context.Payments.Remove(entity);
             _context.SaveChanges();
         }
+    }
+
+    public List<PaymentItem> GetPaymentItems(Guid paymentId) =>
+        _context.PaymentItems.Where(item => item.PaymentId == paymentId).ToList();
+
+    public void AddPaymentItems(List<PaymentItem> items)
+    {
+        _context.PaymentItems.AddRange(items);
+        _context.SaveChanges();
     }
 }

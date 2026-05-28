@@ -12,6 +12,12 @@ public interface IDataRepository
     void UpdateSeller(Seller seller);
     void DeleteSeller(Guid id);
 
+    // Categories
+    List<Category> GetCategories();
+    Category? GetCategory(Guid id);
+    void AddCategory(Category category);
+    void UpdateCategory(Category category);
+
     // Products
     List<Product> GetProductsBySeller(Guid sellerId);
     Product? GetProduct(Guid id);
@@ -33,19 +39,28 @@ public interface IDataRepository
     void AddPayment(Payment payment);
     void UpdatePayment(Payment payment);
     void DeletePayment(Guid id);
+    List<PaymentItem> GetPaymentItems(Guid paymentId);
+    void AddPaymentItems(List<PaymentItem> items);
 }
 
 public class InMemoryDataRepository : IDataRepository
 {
     private List<Seller> _sellers = new();
+    private List<Category> _categories = new();
     private List<Product> _products = new();
     private List<Customer> _customers = new();
     private List<Payment> _payments = new();
+    private List<PaymentItem> _paymentItems = new();
 
     public Seller? GetSeller(Guid id) => _sellers.FirstOrDefault(s => s.Id == id);
     public void AddSeller(Seller seller) => _sellers.Add(seller);
     public void UpdateSeller(Seller seller) { }
     public void DeleteSeller(Guid id) => _sellers.RemoveAll(s => s.Id == id);
+
+    public List<Category> GetCategories() => _categories.ToList();
+    public Category? GetCategory(Guid id) => _categories.FirstOrDefault(c => c.Id == id);
+    public void AddCategory(Category category) => _categories.Add(category);
+    public void UpdateCategory(Category category) { }
 
     public List<Product> GetProductsBySeller(Guid sellerId) =>
         _products.Where(p => p.SellerId == sellerId).ToList();
@@ -77,4 +92,6 @@ public class InMemoryDataRepository : IDataRepository
     public void AddPayment(Payment payment) => _payments.Add(payment);
     public void UpdatePayment(Payment payment) { }
     public void DeletePayment(Guid id) => _payments.RemoveAll(p => p.Id == id);
+    public List<PaymentItem> GetPaymentItems(Guid paymentId) => _paymentItems.Where(i => i.PaymentId == paymentId).ToList();
+    public void AddPaymentItems(List<PaymentItem> items) => _paymentItems.AddRange(items);
 }

@@ -12,8 +12,8 @@ using PayFlow.API.Data;
 namespace PayFlow.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260528011720_Initial")]
-    partial class Initial
+    [Migration("20260528223223_AddCategoriesProductMediaPaymentItems")]
+    partial class AddCategoriesProductMediaPaymentItems
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -49,8 +49,50 @@ namespace PayFlow.API.Migrations
                     b.Property<DateTime?>("PaidAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("PaymentMessageSentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PixCopyPaste")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("PixExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PixHostedInstructionsUrl")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("PixMessageSentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PixQrCodeImageUrl")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PixQrCodeSvgUrl")
+                        .HasColumnType("text");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("StockDeductedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("StripeCheckoutSessionId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("StripeCheckoutUrl")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("StripeCheckoutUrlExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("StripePaymentIntentId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("StripePaymentMethod")
+                        .HasColumnType("text");
+
+                    b.Property<string>("StripePaymentStatus")
+                        .HasColumnType("text");
 
                     b.Property<int>("TotalInstallments")
                         .HasColumnType("integer");
@@ -62,6 +104,44 @@ namespace PayFlow.API.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Payments");
+                });
+
+            modelBuilder.Entity("PayFlow.Domain.Billing.Entities.PaymentItem", b =>
+                {
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("PaymentId", "ProductId");
+
+                    b.ToTable("PaymentItems");
+                });
+
+            modelBuilder.Entity("PayFlow.Domain.Sales.Entities.Category", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Categories");
                 });
 
             modelBuilder.Entity("PayFlow.Domain.Sales.Entities.Customer", b =>
@@ -96,7 +176,15 @@ namespace PayFlow.API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CategoryId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ImageUrl")
                         .IsRequired()
                         .HasColumnType("text");
 

@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services
 builder.Services.AddControllers();
+builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection("Stripe"));
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
@@ -17,6 +18,9 @@ builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<IStripePixService, StripePixService>();
+builder.Services.AddScoped<IStripeCheckoutService, StripeCheckoutService>();
+builder.Services.AddScoped<IStripePaymentStatusService, StripePaymentStatusService>();
 
 // Add CORS configuration
 builder.Services.AddCors(options =>
@@ -35,6 +39,7 @@ var app = builder.Build();
 // Use middleware
 app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseCors("AllowFrontend");
+app.UseStaticFiles();
 app.MapControllers();
 
 // Health check endpoints

@@ -1,5 +1,3 @@
-using System.Net;
-using System.Text.Json;
 using PayFlow.API.Exceptions;
 
 namespace PayFlow.API.Middleware;
@@ -34,16 +32,14 @@ public class ErrorHandlingMiddleware
 
         var response = new { message = exception.Message, error = exception.GetType().Name };
 
-        return exception switch
+        context.Response.StatusCode = exception switch
         {
-            NotFoundException => (context.Response.StatusCode = StatusCodes.Status404NotFound, Task.CompletedTask).Item2,
-            ValidationException => (context.Response.StatusCode = StatusCodes.Status400BadRequest, Task.CompletedTask).Item2,
-            UnauthorizedException => (context.Response.StatusCode = StatusCodes.Status401Unauthorized, Task.CompletedTask).Item2,
-            _ => (context.Response.StatusCode = StatusCodes.Status500InternalServerError, Task.CompletedTask).Item2
+            NotFoundException => StatusCodes.Status404NotFound,
+            ValidationException => StatusCodes.Status400BadRequest,
+            UnauthorizedException => StatusCodes.Status401Unauthorized,
+            _ => StatusCodes.Status500InternalServerError
         };
 
-        #pragma warning disable CS0162
         return context.Response.WriteAsJsonAsync(response);
-        #pragma warning restore CS0162
     }
 }
