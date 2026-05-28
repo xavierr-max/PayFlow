@@ -13,7 +13,7 @@ public abstract class Entity(Guid id)
     /// <summary>
     /// Unique identifier of the entity.
     /// </summary>
-    private Guid Id { get; } = id;
+    public Guid Id { get; } = id;
 
     public override bool Equals(object? obj)
     {
