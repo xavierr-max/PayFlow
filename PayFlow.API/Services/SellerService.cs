@@ -44,7 +44,7 @@ public class SellerService : ISellerService
         if (seller == null)
             throw new NotFoundException($"Seller with ID {id} not found");
 
-        seller.Update(request.Name, request.StoreName, request.PixKey);
+        seller.Update(request.Name, request.StoreName, request.PixKey, request.ConnectedAccountId);
         _repository.UpdateSeller(seller);
         return MapToResponse(seller);
     }

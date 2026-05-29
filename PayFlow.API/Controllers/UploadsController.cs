@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PayFlow.API.Exceptions;
 
@@ -5,6 +6,7 @@ namespace PayFlow.API.Controllers;
 
 [ApiController]
 [Route("api/uploads")]
+[Authorize]
 public class UploadsController : ControllerBase
 {
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)

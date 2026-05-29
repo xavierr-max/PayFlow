@@ -12,6 +12,7 @@ public class PaymentResponse
     public DateTime? PaidAt { get; set; }
     public string TxId { get; set; } = string.Empty;
     public Guid CustomerId { get; set; }
+    public Guid SellerId { get; set; }
     public string CustomerName { get; set; } = string.Empty;
     public string CustomerPhone { get; set; } = string.Empty;
     public string? StripePaymentIntentId { get; set; }

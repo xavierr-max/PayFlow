@@ -1,5 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using PayFlow.API.Auth;
+using PayFlow.API.Exceptions;
 using PayFlow.API.Services;
 using PayFlow.API.DTOs.Requests;
 using Stripe;
@@ -9,6 +12,7 @@ namespace PayFlow.API.Controllers;
 
 [ApiController]
 [Route("api")]
+[Authorize]
 public class PaymentsController : ControllerBase
 {
     private readonly IPaymentService _paymentService;
@@ -23,6 +27,7 @@ public class PaymentsController : ControllerBase
     [HttpPost("sellers/{sellerId}/payments")]
     public IActionResult CreatePayment(Guid sellerId, [FromBody] CreatePaymentRequest request)
     {
+        EnsureSellerAccess(sellerId);
         var payment = _paymentService.CreatePayment(sellerId, request);
         return CreatedAtAction(nameof(GetPayment), new { id = payment.Id }, payment);
     }
@@ -30,6 +35,7 @@ public class PaymentsController : ControllerBase
     [HttpGet("sellers/{sellerId}/payments")]
     public IActionResult GetPaymentsBySeller(Guid sellerId, [FromQuery] string? status)
     {
+        EnsureSellerAccess(sellerId);
         var payments = string.IsNullOrEmpty(status)
             ? _paymentService.GetPaymentsBySeller(sellerId)
             : _paymentService.GetPaymentsByStatus(sellerId, status);
@@ -40,12 +46,14 @@ public class PaymentsController : ControllerBase
     public IActionResult GetPayment(Guid id)
     {
         var payment = _paymentService.GetPayment(id);
+        EnsureSellerAccess(payment.SellerId);
         return Ok(payment);
     }
 
     [HttpPut("payments/{id}/mark-paid")]
     public IActionResult MarkAsPaid(Guid id, [FromBody] MarkPaymentPaidRequest request)
     {
+        EnsurePaymentAccess(id);
         var payment = _paymentService.MarkAsPaid(id, request);
         return Ok(payment);
     }
@@ -53,6 +61,7 @@ public class PaymentsController : ControllerBase
     [HttpPost("payments/{id}/pix-whatsapp")]
     public async Task<IActionResult> CreatePixWhatsappMessage(Guid id, CancellationToken cancellationToken)
     {
+        EnsurePaymentAccess(id);
         var payment = await _paymentService.CreatePixWhatsappMessage(id, cancellationToken);
         return Ok(payment);
     }
@@ -60,21 +69,16 @@ public class PaymentsController : ControllerBase
     [HttpPost("payments/{id}/whatsapp")]
     public async Task<IActionResult> CreateWhatsappPaymentMessage(
         Guid id,
-        [FromBody] CreatePaymentWhatsappMessageRequest? request,
+        [FromBody] CreatePaymentWhatsappMessageRequest request,
         CancellationToken cancellationToken)
     {
+        EnsurePaymentAccess(id);
         var payment = await _paymentService.CreateWhatsappPaymentMessage(id, request, cancellationToken);
         return Ok(payment);
     }
 
-    [HttpPost("payments/{id}/sync-stripe-status")]
-    public async Task<IActionResult> SyncStripePaymentStatus(Guid id, CancellationToken cancellationToken)
-    {
-        var payment = await _paymentService.RefreshStripePaymentStatus(id, cancellationToken);
-        return Ok(payment);
-    }
-
     [HttpPost("stripe/webhook")]
+    [AllowAnonymous]
     public async Task<IActionResult> StripeWebhook(CancellationToken cancellationToken)
     {
         var json = await new StreamReader(HttpContext.Request.Body).ReadToEndAsync(cancellationToken);
@@ -114,7 +118,20 @@ public class PaymentsController : ControllerBase
     [HttpDelete("payments/{id}")]
     public IActionResult DeletePayment(Guid id)
     {
+        EnsurePaymentAccess(id);
         _paymentService.DeletePayment(id);
         return NoContent();
+    }
+
+    private void EnsurePaymentAccess(Guid paymentId)
+    {
+        var payment = _paymentService.GetPayment(paymentId);
+        EnsureSellerAccess(payment.SellerId);
+    }
+
+    private void EnsureSellerAccess(Guid sellerId)
+    {
+        if (!User.CanAccessSeller(sellerId))
+            throw new UnauthorizedException("Você não tem acesso a este vendedor");
     }
 }

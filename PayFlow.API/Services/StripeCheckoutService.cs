@@ -13,6 +13,7 @@ public interface IStripeCheckoutService
         Payment payment,
         CustomerEntity customer,
         string storeName,
+        string? connectedAccountId,
         CancellationToken cancellationToken);
 }
 
@@ -35,6 +36,7 @@ public class StripeCheckoutService : IStripeCheckoutService
         Payment payment,
         CustomerEntity customer,
         string storeName,
+        string? connectedAccountId,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(_options.SecretKey))
@@ -53,7 +55,8 @@ public class StripeCheckoutService : IStripeCheckoutService
             };
 
             var service = new SessionService(new StripeClient(_options.SecretKey));
-            var session = await service.CreateAsync(new SessionCreateOptions
+
+            var sessionOptions = new SessionCreateOptions
             {
                 Mode = "payment",
                 SuccessUrl = _options.CheckoutSuccessUrl,
@@ -82,7 +85,17 @@ public class StripeCheckoutService : IStripeCheckoutService
                         }
                     }
                 }
-            }, cancellationToken: cancellationToken);
+            };
+
+            if (!string.IsNullOrWhiteSpace(connectedAccountId))
+            {
+                sessionOptions.PaymentIntentData.TransferData = new SessionPaymentIntentDataTransferDataOptions
+                {
+                    Destination = connectedAccountId
+                };
+            }
+
+            var session = await service.CreateAsync(sessionOptions, cancellationToken: cancellationToken);
 
             if (string.IsNullOrWhiteSpace(session.Url))
                 throw new ValidationException("Stripe não retornou a URL do Checkout");

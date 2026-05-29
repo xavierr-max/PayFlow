@@ -6,4 +6,5 @@ public class SellerResponse
     public string Name { get; set; }
     public string StoreName { get; set; }
     public string PixKey { get; set; }
+    public string? ConnectedAccountId { get; set; }
 }

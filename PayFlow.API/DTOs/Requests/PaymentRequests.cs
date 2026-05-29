@@ -23,6 +23,12 @@ public class MarkPaymentPaidRequest
     public DateTime? PaidAt { get; set; }
 }
 
+public class UpdatePaymentDatesRequest
+{
+    public DateTime? DueDate { get; set; }
+    public DateTime? PaidAt { get; set; }
+}
+
 public class CreatePaymentWhatsappMessageRequest
 {
     public string PaymentMethod { get; set; } = "pix";

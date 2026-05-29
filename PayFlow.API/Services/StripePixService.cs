@@ -8,7 +8,7 @@ namespace PayFlow.API.Services;
 
 public interface IStripePixService
 {
-    Task<StripePixResult> CreatePixAsync(Payment payment, CustomerEntity customer, string storeName, CancellationToken cancellationToken);
+    Task<StripePixResult> CreatePixAsync(Payment payment, CustomerEntity customer, string storeName, string? connectedAccountId, CancellationToken cancellationToken);
 }
 
 public record StripePixResult(
@@ -29,7 +29,7 @@ public class StripePixService : IStripePixService
         _options = options.Value;
     }
 
-    public async Task<StripePixResult> CreatePixAsync(Payment payment, CustomerEntity customer, string storeName, CancellationToken cancellationToken)
+    public async Task<StripePixResult> CreatePixAsync(Payment payment, CustomerEntity customer, string storeName, string? connectedAccountId, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(_options.SecretKey))
             throw new ValidationException("Configure Stripe:SecretKey para gerar cobranças PIX");
@@ -37,7 +37,7 @@ public class StripePixService : IStripePixService
         try
         {
             var service = new PaymentIntentService(new StripeClient(_options.SecretKey));
-            var intent = await service.CreateAsync(new PaymentIntentCreateOptions
+            var intentOptions = new PaymentIntentCreateOptions
             {
                 Amount = ToCents(payment.Amount),
                 Currency = "brl",
@@ -68,7 +68,17 @@ public class StripePixService : IStripePixService
                     ["payflow_store_name"] = storeName,
                     ["payflow_installment"] = $"{payment.InstallmentNumber}/{payment.TotalInstallments}"
                 }
-            }, cancellationToken: cancellationToken);
+            };
+
+            if (!string.IsNullOrWhiteSpace(connectedAccountId))
+            {
+                intentOptions.TransferData = new PaymentIntentTransferDataOptions
+                {
+                    Destination = connectedAccountId
+                };
+            }
+
+            var intent = await service.CreateAsync(intentOptions, cancellationToken: cancellationToken);
 
             var pix = intent.NextAction?.PixDisplayQrCode;
             if (pix == null || string.IsNullOrWhiteSpace(pix.Data))

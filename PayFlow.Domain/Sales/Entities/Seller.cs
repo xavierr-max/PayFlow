@@ -16,19 +16,35 @@ public class Seller : Entity
         Name = name;
         StoreName = storeName;
         PixKey = pixKey;
+        ConnectedAccountId = null;
     }
 
     public string Name { get; private set; }
     public string StoreName { get; private set; }
     public string PixKey { get; private set; }
+    public string? ConnectedAccountId { get; private set; }
 
-    public void Update(string name, string storeName, string pixKey)
+    public void Update(string name, string storeName, string pixKey, string? connectedAccountId = null)
     {
         Validate(name, storeName, pixKey);
 
         Name = name;
         StoreName = storeName;
         PixKey = pixKey;
+        if (connectedAccountId != null)
+            ConnectedAccountId = connectedAccountId;
+    }
+
+    public void SetConnectedAccountId(string connectedAccountId)
+    {
+        if (string.IsNullOrWhiteSpace(connectedAccountId))
+            throw new ArgumentException("Connected account ID cannot be empty");
+        ConnectedAccountId = connectedAccountId;
+    }
+
+    public bool HasConnectedAccount()
+    {
+        return !string.IsNullOrWhiteSpace(ConnectedAccountId);
     }
 
     public bool HasPixKey()

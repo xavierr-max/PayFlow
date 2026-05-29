@@ -5,6 +5,7 @@ public class CreateSellerRequest
     public string Name { get; set; }
     public string StoreName { get; set; }
     public string PixKey { get; set; }
+    public string? ConnectedAccountId { get; set; }
 }
 
 public class UpdateSellerRequest
@@ -12,4 +13,5 @@ public class UpdateSellerRequest
     public string Name { get; set; }
     public string StoreName { get; set; }
     public string PixKey { get; set; }
+    public string? ConnectedAccountId { get; set; }
 }

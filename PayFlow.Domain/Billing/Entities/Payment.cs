@@ -16,7 +16,7 @@ public class Payment : Entity
 
         Status = PaymentStatus.Pending;
         CreatedAt = DateTime.UtcNow;
-        DueDate = dueDate;
+        DueDate = NormalizeDate(dueDate);
 
         Amount = amount;
         InstallmentNumber = number;
@@ -62,6 +62,14 @@ public class Payment : Entity
 
         Status = PaymentStatus.Paid;
         PaidAt = NormalizePaidAt(paidAt);
+    }
+
+    public void UpdateDueDate(DateTime dueDate)
+    {
+        DueDate = NormalizeDate(dueDate);
+
+        if (Status == PaymentStatus.Overdue && DateTime.UtcNow <= DueDate)
+            Status = PaymentStatus.Pending;
     }
 
     public void MarkAsOverdue()
@@ -177,11 +185,16 @@ public class Payment : Entity
         if (!paidAt.HasValue)
             return DateTime.UtcNow;
 
-        return paidAt.Value.Kind switch
+        return NormalizeDate(paidAt.Value);
+    }
+
+    private static DateTime NormalizeDate(DateTime date)
+    {
+        return date.Kind switch
         {
-            DateTimeKind.Utc => paidAt.Value,
-            DateTimeKind.Local => paidAt.Value.ToUniversalTime(),
-            _ => DateTime.SpecifyKind(paidAt.Value, DateTimeKind.Utc)
+            DateTimeKind.Utc => date,
+            DateTimeKind.Local => date.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(date, DateTimeKind.Utc)
         };
     }
 

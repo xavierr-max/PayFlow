@@ -3,8 +3,8 @@ using PayFlow.Domain.Sales.Enum;
 using PayFlow.API.DTOs.Requests;
 using PayFlow.API.DTOs.Responses;
 using PayFlow.API.Exceptions;
-using PayFlow.Domain.Sales.Entities;
 using System.Globalization;
+using Stripe;
 
 namespace PayFlow.API.Services;
 
@@ -16,8 +16,7 @@ public interface IPaymentService
     List<PaymentResponse> GetPaymentsByStatus(Guid sellerId, string status);
     PaymentResponse MarkAsPaid(Guid id, MarkPaymentPaidRequest request);
     Task<PaymentResponse> CreatePixWhatsappMessage(Guid id, CancellationToken cancellationToken);
-    Task<PaymentResponse> CreateWhatsappPaymentMessage(Guid id, CreatePaymentWhatsappMessageRequest? request, CancellationToken cancellationToken);
-    Task<PaymentResponse> RefreshStripePaymentStatus(Guid id, CancellationToken cancellationToken);
+    Task<PaymentResponse> CreateWhatsappPaymentMessage(Guid id, CreatePaymentWhatsappMessageRequest request, CancellationToken cancellationToken);
     PaymentResponse SyncStripePaymentIntentStatus(Guid id, string stripePaymentIntentId, string stripePaymentStatus);
     PaymentResponse SyncStripeCheckoutSessionStatus(Guid id, string checkoutSessionId, string? paymentIntentId, string paymentStatus);
     void DeletePayment(Guid id);
@@ -29,20 +28,20 @@ public class PaymentService : IPaymentService
     private readonly ICustomerService _customerService;
     private readonly IStripePixService _stripePixService;
     private readonly IStripeCheckoutService _stripeCheckoutService;
-    private readonly IStripePaymentStatusService _stripePaymentStatusService;
+    private readonly IPixService _pixService;
 
     public PaymentService(
         IDataRepository repository,
         ICustomerService customerService,
         IStripePixService stripePixService,
         IStripeCheckoutService stripeCheckoutService,
-        IStripePaymentStatusService stripePaymentStatusService)
+        IPixService pixService)
     {
         _repository = repository;
         _customerService = customerService;
         _stripePixService = stripePixService;
         _stripeCheckoutService = stripeCheckoutService;
-        _stripePaymentStatusService = stripePaymentStatusService;
+        _pixService = pixService;
     }
 
     public PaymentResponse CreatePayment(Guid sellerId, CreatePaymentRequest request)
@@ -52,14 +51,8 @@ public class PaymentService : IPaymentService
             throw new NotFoundException($"Customer with ID {request.CustomerId} not found for this seller");
 
         var payment = new Payment(request.DueDate, request.Amount, request.InstallmentNumber, request.TotalInstallments, request.CustomerId);
-        var items = BuildPaymentItems(payment, sellerId, request.Items);
-
         _repository.AddPayment(payment);
-
-        if (items.Count > 0)
-            _repository.AddPaymentItems(items);
-
-        return MapToResponse(payment, customer);
+        return MapToResponse(payment, customer.Name, customer.Phone);
     }
 
     public PaymentResponse GetPayment(Guid id)
@@ -69,7 +62,7 @@ public class PaymentService : IPaymentService
             throw new NotFoundException($"Payment with ID {id} not found");
 
         var customer = _repository.GetCustomer(payment.CustomerId);
-        return MapToResponse(payment, customer);
+        return MapToResponse(payment, customer?.Name ?? "", customer?.Phone ?? "");
     }
 
     public List<PaymentResponse> GetPaymentsBySeller(Guid sellerId)
@@ -78,7 +71,7 @@ public class PaymentService : IPaymentService
         return payments.Select(p =>
         {
             var customer = _repository.GetCustomer(p.CustomerId);
-            return MapToResponse(p, customer);
+            return MapToResponse(p, customer?.Name ?? "", customer?.Phone ?? "");
         }).ToList();
     }
 
@@ -91,7 +84,7 @@ public class PaymentService : IPaymentService
         return payments.Select(p =>
         {
             var customer = _repository.GetCustomer(p.CustomerId);
-            return MapToResponse(p, customer);
+            return MapToResponse(p, customer?.Name ?? "", customer?.Phone ?? "");
         }).ToList();
     }
 
@@ -101,12 +94,11 @@ public class PaymentService : IPaymentService
         if (payment == null)
             throw new NotFoundException($"Payment with ID {id} not found");
 
-        payment.MarkAsPaid(request.ValueReceived, request.PaidAt);
-        DeductStockIfPaid(payment);
+        payment.MarkAsPaid(request.ValueReceived);
         _repository.UpdatePayment(payment);
 
         var customer = _repository.GetCustomer(payment.CustomerId);
-        return MapToResponse(payment, customer);
+        return MapToResponse(payment, customer?.Name ?? "", customer?.Phone ?? "");
     }
 
     public async Task<PaymentResponse> CreatePixWhatsappMessage(Guid id, CancellationToken cancellationToken)
@@ -119,7 +111,7 @@ public class PaymentService : IPaymentService
 
     public async Task<PaymentResponse> CreateWhatsappPaymentMessage(
         Guid id,
-        CreatePaymentWhatsappMessageRequest? request,
+        CreatePaymentWhatsappMessageRequest request,
         CancellationToken cancellationToken)
     {
         var payment = _repository.GetPayment(id);
@@ -133,22 +125,66 @@ public class PaymentService : IPaymentService
         if (customer == null)
             throw new NotFoundException($"Customer with ID {payment.CustomerId} not found");
 
-        var storeName = GetStoreName(customer);
-        var paymentMethod = NormalizePaymentMethod(request?.PaymentMethod);
+        var paymentMethod = NormalizePaymentMethod(request.PaymentMethod);
+
+        var seller = _repository.GetSeller(customer.SellerId);
+        var storeName = seller?.StoreName ?? customer.Name;
+        var connectedAccountId = seller?.ConnectedAccountId;
 
         if (paymentMethod == "pix")
         {
             if (!payment.HasActivePix(DateTime.UtcNow))
             {
-                var pix = await _stripePixService.CreatePixAsync(payment, customer, storeName, cancellationToken);
-                payment.AttachStripePix(
-                    pix.PaymentIntentId,
-                    pix.PaymentStatus,
-                    pix.CopyPaste,
-                    pix.QrCodeImageUrl,
-                    pix.QrCodeSvgUrl,
-                    pix.HostedInstructionsUrl,
-                    pix.ExpiresAt);
+                // Try to use seller's static PIX if available
+                if (seller != null && !string.IsNullOrWhiteSpace(seller.PixKey))
+                {
+                    try
+                    {
+                        var pixPayload = await _pixService.GeneratePixPayloadAsync(
+                            seller.PixKey,
+                            storeName,
+                            payment.Amount,
+                            payment.TxId,
+                            cancellationToken);
+
+                        payment.AttachStripePix(
+                            payment.TxId,
+                            "pix_static",
+                            pixPayload.CopyPaste,
+                            pixPayload.QrCodeImageBase64,
+                            pixPayload.QrCodeSvg,
+                            null,
+                            pixPayload.ExpiresAt);
+                    }
+                    catch
+                    {
+                        // Fallback to Stripe PIX if static PIX generation fails
+                        var pix = await _stripePixService.CreatePixAsync(
+                            payment, customer, storeName, connectedAccountId, cancellationToken);
+                        payment.AttachStripePix(
+                            pix.PaymentIntentId,
+                            pix.PaymentStatus,
+                            pix.CopyPaste,
+                            pix.QrCodeImageUrl,
+                            pix.QrCodeSvgUrl,
+                            pix.HostedInstructionsUrl,
+                            pix.ExpiresAt);
+                    }
+                }
+                else
+                {
+                    // Use Stripe PIX if no seller PIX key
+                    var pix = await _stripePixService.CreatePixAsync(
+                        payment, customer, storeName, connectedAccountId, cancellationToken);
+                    payment.AttachStripePix(
+                        pix.PaymentIntentId,
+                        pix.PaymentStatus,
+                        pix.CopyPaste,
+                        pix.QrCodeImageUrl,
+                        pix.QrCodeSvgUrl,
+                        pix.HostedInstructionsUrl,
+                        pix.ExpiresAt);
+                }
             }
 
             payment.MarkPixMessageSent();
@@ -157,7 +193,8 @@ public class PaymentService : IPaymentService
         {
             if (!payment.HasActiveCheckoutSession(DateTime.UtcNow, paymentMethod))
             {
-                var checkout = await _stripeCheckoutService.CreateCardCheckoutSessionAsync(payment, customer, storeName, cancellationToken);
+                var checkout = await _stripeCheckoutService.CreateCardCheckoutSessionAsync(
+                    payment, customer, storeName, connectedAccountId, cancellationToken);
                 payment.AttachStripeCheckoutSession(
                     checkout.SessionId,
                     checkout.CheckoutUrl,
@@ -171,26 +208,7 @@ public class PaymentService : IPaymentService
 
         _repository.UpdatePayment(payment);
 
-        return MapToResponse(payment, customer);
-    }
-
-    public async Task<PaymentResponse> RefreshStripePaymentStatus(Guid id, CancellationToken cancellationToken)
-    {
-        var payment = _repository.GetPayment(id);
-        if (payment == null)
-            throw new NotFoundException($"Payment with ID {id} not found");
-
-        var stripeStatus = await _stripePaymentStatusService.GetStatusAsync(payment, cancellationToken);
-
-        if (!string.IsNullOrWhiteSpace(stripeStatus.PaymentIntentId))
-            payment.AttachStripePaymentIntent(stripeStatus.PaymentIntentId);
-
-        payment.SyncStripePaymentStatus(stripeStatus.PaymentStatus);
-        DeductStockIfPaid(payment);
-        _repository.UpdatePayment(payment);
-
-        var customer = _repository.GetCustomer(payment.CustomerId);
-        return MapToResponse(payment, customer);
+        return MapToResponse(payment, customer.Name, customer.Phone);
     }
 
     public PaymentResponse SyncStripePaymentIntentStatus(Guid id, string stripePaymentIntentId, string stripePaymentStatus)
@@ -206,11 +224,10 @@ public class PaymentService : IPaymentService
         }
 
         payment.SyncStripePaymentStatus(stripePaymentStatus);
-        DeductStockIfPaid(payment);
         _repository.UpdatePayment(payment);
 
         var customer = _repository.GetCustomer(payment.CustomerId);
-        return MapToResponse(payment, customer);
+        return MapToResponse(payment, customer?.Name ?? "", customer?.Phone ?? "");
     }
 
     public PaymentResponse SyncStripeCheckoutSessionStatus(
@@ -231,11 +248,10 @@ public class PaymentService : IPaymentService
 
         payment.AttachStripePaymentIntent(paymentIntentId ?? "");
         payment.SyncStripePaymentStatus(paymentStatus);
-        DeductStockIfPaid(payment);
         _repository.UpdatePayment(payment);
 
         var customer = _repository.GetCustomer(payment.CustomerId);
-        return MapToResponse(payment, customer);
+        return MapToResponse(payment, customer?.Name ?? "", customer?.Phone ?? "");
     }
 
     public void DeletePayment(Guid id)
@@ -258,71 +274,9 @@ public class PaymentService : IPaymentService
         };
     }
 
-    private List<PaymentItem> BuildPaymentItems(Payment payment, Guid sellerId, List<CreatePaymentItemRequest>? requestItems)
+    private static PaymentResponse MapToResponse(Payment payment, string customerName, string customerPhone)
     {
-        if (requestItems == null || requestItems.Count == 0)
-            return new List<PaymentItem>();
-
-        return requestItems
-            .Where(item => item.ProductId != Guid.Empty && item.Quantity > 0)
-            .Select(item =>
-            {
-                var product = _repository.GetProduct(item.ProductId);
-                if (product == null || product.SellerId != sellerId)
-                    throw new ValidationException("Produto inválido para esta venda");
-
-                if (product.Quantity < item.Quantity)
-                    throw new ValidationException($"Estoque insuficiente para {product.Name}");
-
-                var unitPrice = item.UnitPrice > 0 ? item.UnitPrice : product.Price;
-                return new PaymentItem(product.Id, payment.Id, item.Quantity, unitPrice);
-            })
-            .ToList();
-    }
-
-    private void DeductStockIfPaid(Payment payment)
-    {
-        if (payment.Status != PaymentStatus.Paid || payment.StockDeductedAt.HasValue)
-            return;
-
-        var items = _repository.GetPaymentItems(payment.Id);
-        if (items.Count == 0)
-            return;
-
-        foreach (var item in items)
-        {
-            var product = _repository.GetProduct(item.ProductId);
-            if (product == null)
-                continue;
-
-            product.DecreaseStock(item.Quantity);
-            _repository.UpdateProduct(product);
-        }
-
-        payment.MarkStockDeducted();
-    }
-
-    private PaymentResponse MapToResponse(Payment payment, Customer? customer)
-    {
-        return MapToResponse(
-            payment,
-            customer?.Name ?? "",
-            customer?.Phone ?? "",
-            GetStoreName(customer));
-    }
-
-    private string GetStoreName(Customer? customer)
-    {
-        if (customer == null)
-            return "PayFlow";
-
-        var seller = _repository.GetSeller(customer.SellerId);
-        return string.IsNullOrWhiteSpace(seller?.StoreName) ? "PayFlow" : seller.StoreName;
-    }
-
-    private static PaymentResponse MapToResponse(Payment payment, string customerName, string customerPhone, string storeName)
-    {
-        var whatsappMessage = BuildWhatsappMessage(payment, customerName, storeName);
+        var whatsappMessage = BuildWhatsappMessage(payment, customerName);
         var whatsappUrl = BuildWhatsappUrl(customerPhone, whatsappMessage);
 
         return new PaymentResponse
@@ -357,10 +311,10 @@ public class PaymentService : IPaymentService
         };
     }
 
-    private static string? BuildWhatsappMessage(Payment payment, string customerName, string storeName)
+    private static string? BuildWhatsappMessage(Payment payment, string customerName)
     {
         if (payment.StripePaymentMethod?.Equals("card", StringComparison.OrdinalIgnoreCase) == true)
-            return BuildCardWhatsappMessage(payment, customerName, storeName);
+            return BuildCardWhatsappMessage(payment, customerName);
 
         if (string.IsNullOrWhiteSpace(payment.PixCopyPaste) && string.IsNullOrWhiteSpace(payment.PixHostedInstructionsUrl))
             return null;
@@ -369,8 +323,7 @@ public class PaymentService : IPaymentService
         var dueDate = payment.DueDate.ToString("dd/MM/yyyy", CultureInfo.GetCultureInfo("pt-BR"));
         var expiresAt = payment.PixExpiresAt?.ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("pt-BR"));
 
-        var message = $"Olá, {customerName}. Sua cobrança da {storeName} de {amount} vence em {dueDate}.";
-        message += $"\n\nParcela {payment.InstallmentNumber}/{payment.TotalInstallments}.";
+        var message = $"Olá, {customerName}. Sua cobrança PayFlow de {amount} vence em {dueDate}.";
 
         if (!string.IsNullOrWhiteSpace(payment.PixCopyPaste))
             message += $"\n\nPix copia e cola:\n{payment.PixCopyPaste}";
@@ -385,7 +338,7 @@ public class PaymentService : IPaymentService
         return message;
     }
 
-    private static string? BuildCardWhatsappMessage(Payment payment, string customerName, string storeName)
+    private static string? BuildCardWhatsappMessage(Payment payment, string customerName)
     {
         if (string.IsNullOrWhiteSpace(payment.StripeCheckoutUrl))
             return null;
@@ -394,8 +347,7 @@ public class PaymentService : IPaymentService
         var dueDate = payment.DueDate.ToString("dd/MM/yyyy", CultureInfo.GetCultureInfo("pt-BR"));
         var expiresAt = payment.StripeCheckoutUrlExpiresAt?.ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("pt-BR"));
 
-        var message = $"Olá, {customerName}. Sua cobrança da {storeName} de {amount} vence em {dueDate}.";
-        message += $"\n\nParcela {payment.InstallmentNumber}/{payment.TotalInstallments}.";
+        var message = $"Olá, {customerName}. Sua cobrança PayFlow de {amount} vence em {dueDate}.";
         message += $"\n\nPague com cartão de crédito ou débito pelo link seguro da Stripe:\n{payment.StripeCheckoutUrl}";
 
         if (!string.IsNullOrWhiteSpace(expiresAt))
@@ -420,12 +372,11 @@ public class PaymentService : IPaymentService
         return $"https://wa.me/{digits}?text={Uri.EscapeDataString(message)}";
     }
 
-    private static string NormalizePaymentMethod(string? paymentMethod)
+    private static string NormalizePaymentMethod(string paymentMethod)
     {
-        var normalized = paymentMethod?.Trim().ToLowerInvariant();
+        var normalized = paymentMethod.Trim().ToLowerInvariant();
         return normalized switch
         {
-            null or "" => "pix",
             "pix" => "pix",
             "card" => "card",
             "cartao" => "card",
