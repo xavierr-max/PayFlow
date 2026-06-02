@@ -20,9 +20,9 @@ public class SellersController : ControllerBase
     }
 
     [HttpPost]
-    public IActionResult CreateSeller([FromBody] CreateSellerRequest request)
+    public async Task<IActionResult> CreateSeller([FromBody] CreateSellerRequest request, CancellationToken cancellationToken)
     {
-        var seller = _sellerService.CreateSeller(request);
+        var seller = await _sellerService.CreateSellerAsync(request, cancellationToken);
         return CreatedAtAction(nameof(GetSeller), new { id = seller.Id }, seller);
     }
 
@@ -35,11 +35,41 @@ public class SellersController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public IActionResult UpdateSeller(Guid id, [FromBody] UpdateSellerRequest request)
+    public async Task<IActionResult> UpdateSeller(
+        Guid id,
+        [FromBody] UpdateSellerRequest request,
+        CancellationToken cancellationToken)
     {
         EnsureSellerAccess(id);
-        var seller = _sellerService.UpdateSeller(id, request);
+        var seller = await _sellerService.UpdateSellerAsync(id, request, cancellationToken);
         return Ok(seller);
+    }
+
+    [HttpPost("{id}/asaas/subaccount")]
+    public async Task<IActionResult> CreateAsaasSubaccount(Guid id, CancellationToken cancellationToken)
+    {
+        EnsureSellerAccess(id);
+        var account = await _sellerService.CreateAsaasSubaccountAsync(id, cancellationToken);
+        return Ok(account);
+    }
+
+    [HttpPut("{id}/asaas/subaccount-profile")]
+    public async Task<IActionResult> UpdateAsaasSubaccountProfile(
+        Guid id,
+        [FromBody] UpdateSellerAsaasSubaccountRequest request,
+        CancellationToken cancellationToken)
+    {
+        EnsureSellerAccess(id);
+        var seller = await _sellerService.UpdateSellerAsaasSubaccountProfileAsync(id, request, cancellationToken);
+        return Ok(seller);
+    }
+
+    [HttpGet("{id}/asaas/status")]
+    public IActionResult GetAsaasAccountStatus(Guid id)
+    {
+        EnsureSellerAccess(id);
+        var status = _sellerService.GetAsaasAccountStatus(id);
+        return Ok(status);
     }
 
     [HttpDelete("{id}")]

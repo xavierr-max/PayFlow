@@ -26,6 +26,7 @@ public class CustomerService : ICustomerService
     public CustomerResponse CreateCustomer(Guid sellerId, CreateCustomerRequest request)
     {
         var customer = new Customer(request.Name, request.Description, request.Phone, sellerId);
+        customer.UpdateAsaasProfile(request.CpfCnpj, request.Email);
         _repository.AddCustomer(customer);
         return MapToResponse(customer);
     }
@@ -52,6 +53,7 @@ public class CustomerService : ICustomerService
             throw new NotFoundException($"Customer with ID {id} not found");
 
         customer.Update(request.Name, request.Description, request.Phone);
+        customer.UpdateAsaasProfile(request.CpfCnpj, request.Email);
         _repository.UpdateCustomer(customer);
         return MapToResponse(customer);
     }
@@ -73,6 +75,9 @@ public class CustomerService : ICustomerService
             Name = customer.Name,
             Description = customer.Description,
             Phone = customer.Phone,
+            CpfCnpj = customer.CpfCnpj,
+            Email = customer.Email,
+            AsaasCustomerId = customer.AsaasCustomerId,
             SellerId = customer.SellerId
         };
     }

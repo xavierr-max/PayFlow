@@ -17,7 +17,7 @@ namespace PayFlow.API.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.0")
+                .HasAnnotation("ProductVersion", "10.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -232,6 +232,30 @@ namespace PayFlow.API.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("numeric");
 
+                    b.Property<string>("AsaasBillingType")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AsaasCustomerId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AsaasInvoiceUrl")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AsaasPaymentId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AsaasPaymentStatus")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CardBrand")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("CardInstallmentCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CardLast4")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -241,8 +265,35 @@ namespace PayFlow.API.Migrations
                     b.Property<DateTime>("DueDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal?>("FeeAmount")
+                        .HasColumnType("numeric");
+
                     b.Property<int>("InstallmentNumber")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ManualPaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ManualPaidByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("ManualPaidPreviousStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ManualPaidReason")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ManualPaymentReversalReason")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ManualPaymentReversedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ManualPaymentReversedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("NetAmount")
+                        .HasColumnType("numeric");
 
                     b.Property<DateTime?>("PaidAt")
                         .HasColumnType("timestamp with time zone");
@@ -268,29 +319,17 @@ namespace PayFlow.API.Migrations
                     b.Property<string>("PixQrCodeSvgUrl")
                         .HasColumnType("text");
 
+                    b.Property<decimal>("RefundedAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("SellerId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
                     b.Property<DateTime?>("StockDeductedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("StripeCheckoutSessionId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("StripeCheckoutUrl")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("StripeCheckoutUrlExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("StripePaymentIntentId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("StripePaymentMethod")
-                        .HasColumnType("text");
-
-                    b.Property<string>("StripePaymentStatus")
-                        .HasColumnType("text");
 
                     b.Property<int>("TotalInstallments")
                         .HasColumnType("integer");
@@ -300,6 +339,10 @@ namespace PayFlow.API.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AsaasPaymentId");
+
+                    b.HasIndex("SellerId");
 
                     b.ToTable("Payments");
                 });
@@ -321,6 +364,319 @@ namespace PayFlow.API.Migrations
                     b.HasKey("PaymentId", "ProductId");
 
                     b.ToTable("PaymentItems");
+                });
+
+            modelBuilder.Entity("PayFlow.Domain.Billing.Entities.PaymentTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorEmail")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExternalChargeId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExternalProviderPaymentId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExternalRefundId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExternalTransactionId")
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("FeeAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<int?>("InstallmentCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("NetAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PaymentMethod")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProviderAccountId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProviderEventId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("SellerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalChargeId");
+
+                    b.HasIndex("ExternalProviderPaymentId");
+
+                    b.HasIndex("PaymentId");
+
+                    b.HasIndex("SellerId");
+
+                    b.ToTable("PaymentTransactions");
+                });
+
+            modelBuilder.Entity("PayFlow.Domain.Billing.Entities.PremiumSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("CancelAtPeriodEnd")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("CurrentPeriodEnd")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("CurrentPeriodStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProviderCheckoutUrl")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProviderCustomerId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProviderSubscriptionId")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("SellerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProviderCustomerId");
+
+                    b.HasIndex("ProviderSubscriptionId");
+
+                    b.HasIndex("SellerId");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("PremiumSubscriptions");
+                });
+
+            modelBuilder.Entity("PayFlow.Domain.Billing.Entities.PremiumSubscriptionPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExternalChargeId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExternalInvoiceId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExternalProviderPaymentId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("FailureReason")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PremiumSubscriptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("SellerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalInvoiceId");
+
+                    b.HasIndex("PremiumSubscriptionId");
+
+                    b.ToTable("PremiumSubscriptionPayments");
+                });
+
+            modelBuilder.Entity("PayFlow.Domain.Billing.Entities.WebhookEventLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("PaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProcessingStatus")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RawPayload")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SellerId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Provider", "EventId")
+                        .IsUnique();
+
+                    b.ToTable("WebhookEventLogs");
+                });
+
+            modelBuilder.Entity("PayFlow.Domain.Notifications.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Channels")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeduplicationKey")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SellerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TargetUrl")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeduplicationKey");
+
+                    b.HasIndex("SellerId");
+
+                    b.HasIndex("SellerId", "IsRead");
+
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("PayFlow.Domain.Sales.Entities.Category", b =>
@@ -348,8 +704,17 @@ namespace PayFlow.API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AsaasCustomerId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CpfCnpj")
+                        .HasColumnType("text");
+
                     b.Property<string>("Description")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Email")
                         .HasColumnType("text");
 
                     b.Property<string>("Name")
@@ -410,15 +775,61 @@ namespace PayFlow.API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ConnectedAccountId")
+                    b.Property<string>("Address")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AddressNumber")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AsaasAccountId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AsaasApiKey")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AsaasSubaccountStatus")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("AsaasWalletId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CompanyType")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Complement")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CpfCnpj")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("IncomeValue")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("MobilePhone")
                         .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("Phone")
+                        .HasColumnType("text");
+
                     b.Property<string>("PixKey")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PostalCode")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Province")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Site")
                         .HasColumnType("text");
 
                     b.Property<string>("StoreName")

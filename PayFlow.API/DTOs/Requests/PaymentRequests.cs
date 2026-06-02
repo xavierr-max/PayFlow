@@ -21,6 +21,23 @@ public class MarkPaymentPaidRequest
 {
     public decimal ValueReceived { get; set; }
     public DateTime? PaidAt { get; set; }
+    public string? Reason { get; set; }
+}
+
+public class UnmarkPaymentPaidRequest
+{
+    public string Reason { get; set; } = string.Empty;
+}
+
+public class CancelPaymentRequest
+{
+    public string? Reason { get; set; }
+}
+
+public class RefundPaymentRequest
+{
+    public decimal? Amount { get; set; }
+    public string? Reason { get; set; }
 }
 
 public class UpdatePaymentDatesRequest

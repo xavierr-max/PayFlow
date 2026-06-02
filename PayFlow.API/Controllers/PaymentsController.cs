@@ -1,12 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 using PayFlow.API.Auth;
 using PayFlow.API.Exceptions;
 using PayFlow.API.Services;
 using PayFlow.API.DTOs.Requests;
-using Stripe;
-using Stripe.Checkout;
 
 namespace PayFlow.API.Controllers;
 
@@ -16,12 +13,10 @@ namespace PayFlow.API.Controllers;
 public class PaymentsController : ControllerBase
 {
     private readonly IPaymentService _paymentService;
-    private readonly StripeOptions _stripeOptions;
 
-    public PaymentsController(IPaymentService paymentService, IOptions<StripeOptions> stripeOptions)
+    public PaymentsController(IPaymentService paymentService)
     {
         _paymentService = paymentService;
-        _stripeOptions = stripeOptions.Value;
     }
 
     [HttpPost("sellers/{sellerId}/payments")]
@@ -54,7 +49,59 @@ public class PaymentsController : ControllerBase
     public IActionResult MarkAsPaid(Guid id, [FromBody] MarkPaymentPaidRequest request)
     {
         EnsurePaymentAccess(id);
-        var payment = _paymentService.MarkAsPaid(id, request);
+        var payment = _paymentService.MarkAsPaid(id, request, User.GetUserId(), User.GetEmail());
+        return Ok(payment);
+    }
+
+    [HttpPut("payments/{id}/unmark-paid")]
+    public IActionResult UnmarkAsPaid(Guid id, [FromBody] UnmarkPaymentPaidRequest request)
+    {
+        EnsurePaymentAccess(id);
+        var payment = _paymentService.UnmarkAsPaid(id, request, User.GetUserId(), User.GetEmail());
+        return Ok(payment);
+    }
+
+    [HttpPut("payments/{id}/cancel")]
+    public IActionResult CancelPayment(Guid id, [FromBody] CancelPaymentRequest request)
+    {
+        EnsurePaymentAccess(id);
+        var payment = _paymentService.CancelPayment(id, request, User.GetUserId(), User.GetEmail());
+        return Ok(payment);
+    }
+
+    [HttpPut("payments/{id}/dates")]
+    public IActionResult UpdatePaymentDates(Guid id, [FromBody] UpdatePaymentDatesRequest request)
+    {
+        EnsurePaymentAccess(id);
+        var payment = _paymentService.UpdatePaymentDates(id, request, User.GetUserId(), User.GetEmail());
+        return Ok(payment);
+    }
+
+    [HttpGet("payments/{id}/transactions")]
+    public IActionResult GetPaymentTransactions(Guid id)
+    {
+        EnsurePaymentAccess(id);
+        var transactions = _paymentService.GetPaymentTransactions(id);
+        return Ok(transactions);
+    }
+
+    [HttpPost("payments/{id}/sync")]
+    [HttpPost("payments/{id}/sync-asaas-status")]
+    public async Task<IActionResult> SyncPaymentStatus(Guid id, CancellationToken cancellationToken)
+    {
+        EnsurePaymentAccess(id);
+        var payment = await _paymentService.SyncPaymentStatus(id, cancellationToken);
+        return Ok(payment);
+    }
+
+    [HttpPost("payments/{id}/refund")]
+    public async Task<IActionResult> RefundPayment(
+        Guid id,
+        [FromBody] RefundPaymentRequest request,
+        CancellationToken cancellationToken)
+    {
+        EnsurePaymentAccess(id);
+        var payment = await _paymentService.RefundPayment(id, request, cancellationToken);
         return Ok(payment);
     }
 
@@ -77,44 +124,6 @@ public class PaymentsController : ControllerBase
         return Ok(payment);
     }
 
-    [HttpPost("stripe/webhook")]
-    [AllowAnonymous]
-    public async Task<IActionResult> StripeWebhook(CancellationToken cancellationToken)
-    {
-        var json = await new StreamReader(HttpContext.Request.Body).ReadToEndAsync(cancellationToken);
-
-        Event stripeEvent;
-        try
-        {
-            stripeEvent = string.IsNullOrWhiteSpace(_stripeOptions.WebhookSecret)
-                ? EventUtility.ParseEvent(json)
-                : EventUtility.ConstructEvent(json, Request.Headers["Stripe-Signature"], _stripeOptions.WebhookSecret);
-        }
-        catch (StripeException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-
-        if (stripeEvent.Data.Object is PaymentIntent paymentIntent &&
-            paymentIntent.Metadata.TryGetValue("payflow_payment_id", out var paymentIdValue) &&
-            Guid.TryParse(paymentIdValue, out var paymentId))
-        {
-            _paymentService.SyncStripePaymentIntentStatus(paymentId, paymentIntent.Id, paymentIntent.Status);
-        }
-        else if (stripeEvent.Data.Object is Session session &&
-                 session.Metadata.TryGetValue("payflow_payment_id", out var checkoutPaymentIdValue) &&
-                 Guid.TryParse(checkoutPaymentIdValue, out var checkoutPaymentId))
-        {
-            _paymentService.SyncStripeCheckoutSessionStatus(
-                checkoutPaymentId,
-                session.Id,
-                session.PaymentIntentId,
-                session.PaymentStatus);
-        }
-
-        return Ok();
-    }
-
     [HttpDelete("payments/{id}")]
     public IActionResult DeletePayment(Guid id)
     {
@@ -134,4 +143,5 @@ public class PaymentsController : ControllerBase
         if (!User.CanAccessSeller(sellerId))
             throw new UnauthorizedException("Você não tem acesso a este vendedor");
     }
+
 }

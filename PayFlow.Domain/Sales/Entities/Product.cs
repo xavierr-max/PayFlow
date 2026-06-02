@@ -22,13 +22,13 @@ public class Product : Entity
         ImageUrl = imageUrl;
     }
 
-    public string Name { get; private set; }
-    public string Description { get; private set; }
+    public string Name { get; private set; } = string.Empty;
+    public string Description { get; private set; } = string.Empty;
     public decimal Price { get; private set; }
     public int Quantity { get; private set; }
     public Guid SellerId { get; private set; }
-    public string CategoryId { get; private set; }
-    public string ImageUrl { get; private set; }
+    public string CategoryId { get; private set; } = string.Empty;
+    public string ImageUrl { get; private set; } = string.Empty;
 
     public void Update(string name, string description, decimal price, int quantity, string categoryId, string imageUrl)
     {

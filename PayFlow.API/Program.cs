@@ -6,13 +6,15 @@ using PayFlow.API.Auth;
 using PayFlow.API.Services;
 using PayFlow.API.Middleware;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using PayFlow.API.Data;
+using System.Net.Sockets;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services
 builder.Services.AddControllers();
-builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection("Stripe"));
+builder.Services.Configure<AsaasOptions>(builder.Configuration.GetSection("Asaas"));
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
@@ -64,11 +66,10 @@ builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
-builder.Services.AddScoped<IPixService, PixService>();
-builder.Services.AddScoped<IStripeConnectService, StripeConnectService>();
-builder.Services.AddScoped<IStripePixService, StripePixService>();
-builder.Services.AddScoped<IStripeCheckoutService, StripeCheckoutService>();
-builder.Services.AddScoped<IStripePaymentStatusService, StripePaymentStatusService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IPremiumSubscriptionService, PremiumSubscriptionService>();
+builder.Services.AddScoped<IAsaasService, AsaasService>();
+builder.Services.AddScoped<IAsaasWebhookService, AsaasWebhookService>();
 
 // Add CORS configuration
 builder.Services.AddCors(options =>
@@ -98,8 +99,70 @@ app.MapGet("/api/health", () => new { status = "ok", timestamp = DateTime.UtcNow
 
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+    var applyMigrations = app.Configuration.GetValue("Database:ApplyMigrationsOnStartup", true);
+    var requireDatabase = app.Configuration.GetValue("Database:RequireOnStartup", !app.Environment.IsDevelopment());
+
+    if (applyMigrations)
+    {
+        var connectionString = app.Configuration.GetConnectionString("DefaultConnection");
+
+        if (!requireDatabase && !IsPostgresPortReachable(connectionString))
+        {
+            logger.LogWarning(
+                "PostgreSQL não está acessível em {Target}. A API continuará em modo de desenvolvimento, mas endpoints que usam banco falharão até o banco estar online.",
+                GetPostgresConnectionTarget(connectionString));
+        }
+        else
+        {
+            try
+            {
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                db.Database.Migrate();
+            }
+            catch (Exception ex) when (!requireDatabase)
+            {
+                logger.LogWarning(
+                    "Não foi possível aplicar migrations no PostgreSQL. A API continuará em modo de desenvolvimento. Motivo: {Message}",
+                    ex.Message);
+            }
+        }
+    }
 }
 
 app.Run();
+
+static bool IsPostgresPortReachable(string? connectionString)
+{
+    try
+    {
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+        var host = GetFirstHost(builder.Host);
+        using var client = new TcpClient();
+        return client.ConnectAsync(host, builder.Port).Wait(TimeSpan.FromMilliseconds(500)) && client.Connected;
+    }
+    catch
+    {
+        return false;
+    }
+}
+
+static string GetPostgresConnectionTarget(string? connectionString)
+{
+    try
+    {
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+        return $"{GetFirstHost(builder.Host)}:{builder.Port}";
+    }
+    catch
+    {
+        return "PostgreSQL configurado";
+    }
+}
+
+static string GetFirstHost(string? host)
+{
+    return string.IsNullOrWhiteSpace(host)
+        ? "localhost"
+        : host.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? "localhost";
+}

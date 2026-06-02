@@ -100,17 +100,21 @@ public class EfDataRepository : IDataRepository
     // Payments
     public List<Payment> GetPaymentsBySeller(Guid sellerId)
     {
-        var customerIds = _context.Customers.Where(c => c.SellerId == sellerId).Select(c => c.Id).ToList();
-        return _context.Payments.Where(p => customerIds.Contains(p.CustomerId)).ToList();
+        return _context.Payments.Where(p => p.SellerId == sellerId).ToList();
     }
 
     public List<Payment> GetPaymentsByStatus(Guid sellerId, PaymentStatus status)
     {
-        var customerIds = _context.Customers.Where(c => c.SellerId == sellerId).Select(c => c.Id).ToList();
-        return _context.Payments.Where(p => customerIds.Contains(p.CustomerId) && p.Status == status).ToList();
+        return _context.Payments.Where(p => p.SellerId == sellerId && p.Status == status).ToList();
     }
 
     public Payment? GetPayment(Guid id) => _context.Payments.Find(id);
+    public Payment? GetPaymentByAsaasPaymentId(string asaasPaymentId) =>
+        _context.Payments.FirstOrDefault(p => p.AsaasPaymentId == asaasPaymentId);
+
+    public Payment? GetPaymentByTxId(string txId) =>
+        _context.Payments.FirstOrDefault(p => p.TxId == txId);
+
     public void AddPayment(Payment payment)
     {
         _context.Payments.Add(payment);
@@ -137,6 +141,33 @@ public class EfDataRepository : IDataRepository
     public void AddPaymentItems(List<PaymentItem> items)
     {
         _context.PaymentItems.AddRange(items);
+        _context.SaveChanges();
+    }
+
+    public List<PaymentTransaction> GetPaymentTransactions(Guid paymentId) =>
+        _context.PaymentTransactions
+            .Where(transaction => transaction.PaymentId == paymentId)
+            .OrderByDescending(transaction => transaction.OccurredAt)
+            .ToList();
+
+    public void AddPaymentTransaction(PaymentTransaction transaction)
+    {
+        _context.PaymentTransactions.Add(transaction);
+        _context.SaveChanges();
+    }
+
+    public WebhookEventLog? GetWebhookEventLog(string provider, string eventId) =>
+        _context.WebhookEventLogs.FirstOrDefault(log => log.Provider == provider && log.EventId == eventId);
+
+    public void AddWebhookEventLog(WebhookEventLog webhookEventLog)
+    {
+        _context.WebhookEventLogs.Add(webhookEventLog);
+        _context.SaveChanges();
+    }
+
+    public void UpdateWebhookEventLog(WebhookEventLog webhookEventLog)
+    {
+        _context.WebhookEventLogs.Update(webhookEventLog);
         _context.SaveChanges();
     }
 }

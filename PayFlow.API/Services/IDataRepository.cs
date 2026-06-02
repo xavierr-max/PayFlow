@@ -36,11 +36,18 @@ public interface IDataRepository
     List<Payment> GetPaymentsBySeller(Guid sellerId);
     List<Payment> GetPaymentsByStatus(Guid sellerId, PaymentStatus status);
     Payment? GetPayment(Guid id);
+    Payment? GetPaymentByAsaasPaymentId(string asaasPaymentId);
+    Payment? GetPaymentByTxId(string txId);
     void AddPayment(Payment payment);
     void UpdatePayment(Payment payment);
     void DeletePayment(Guid id);
     List<PaymentItem> GetPaymentItems(Guid paymentId);
     void AddPaymentItems(List<PaymentItem> items);
+    List<PaymentTransaction> GetPaymentTransactions(Guid paymentId);
+    void AddPaymentTransaction(PaymentTransaction transaction);
+    WebhookEventLog? GetWebhookEventLog(string provider, string eventId);
+    void AddWebhookEventLog(WebhookEventLog webhookEventLog);
+    void UpdateWebhookEventLog(WebhookEventLog webhookEventLog);
 }
 
 public class InMemoryDataRepository : IDataRepository
@@ -51,6 +58,8 @@ public class InMemoryDataRepository : IDataRepository
     private List<Customer> _customers = new();
     private List<Payment> _payments = new();
     private List<PaymentItem> _paymentItems = new();
+    private List<PaymentTransaction> _paymentTransactions = new();
+    private List<WebhookEventLog> _webhookEventLogs = new();
 
     public Seller? GetSeller(Guid id) => _sellers.FirstOrDefault(s => s.Id == id);
     public void AddSeller(Seller seller) => _sellers.Add(seller);
@@ -79,19 +88,29 @@ public class InMemoryDataRepository : IDataRepository
     public List<Payment> GetPaymentsBySeller(Guid sellerId)
     {
         var customerIds = _customers.Where(c => c.SellerId == sellerId).Select(c => c.Id).ToList();
-        return _payments.Where(p => customerIds.Contains(p.CustomerId)).ToList();
+        return _payments.Where(p => p.SellerId == sellerId || customerIds.Contains(p.CustomerId)).ToList();
     }
 
     public List<Payment> GetPaymentsByStatus(Guid sellerId, PaymentStatus status)
     {
         var customerIds = _customers.Where(c => c.SellerId == sellerId).Select(c => c.Id).ToList();
-        return _payments.Where(p => customerIds.Contains(p.CustomerId) && p.Status == status).ToList();
+        return _payments.Where(p => (p.SellerId == sellerId || customerIds.Contains(p.CustomerId)) && p.Status == status).ToList();
     }
 
     public Payment? GetPayment(Guid id) => _payments.FirstOrDefault(p => p.Id == id);
+    public Payment? GetPaymentByAsaasPaymentId(string asaasPaymentId) =>
+        _payments.FirstOrDefault(p => p.AsaasPaymentId == asaasPaymentId);
+    public Payment? GetPaymentByTxId(string txId) => _payments.FirstOrDefault(p => p.TxId == txId);
     public void AddPayment(Payment payment) => _payments.Add(payment);
     public void UpdatePayment(Payment payment) { }
     public void DeletePayment(Guid id) => _payments.RemoveAll(p => p.Id == id);
     public List<PaymentItem> GetPaymentItems(Guid paymentId) => _paymentItems.Where(i => i.PaymentId == paymentId).ToList();
     public void AddPaymentItems(List<PaymentItem> items) => _paymentItems.AddRange(items);
+    public List<PaymentTransaction> GetPaymentTransactions(Guid paymentId) =>
+        _paymentTransactions.Where(t => t.PaymentId == paymentId).ToList();
+    public void AddPaymentTransaction(PaymentTransaction transaction) => _paymentTransactions.Add(transaction);
+    public WebhookEventLog? GetWebhookEventLog(string provider, string eventId) =>
+        _webhookEventLogs.FirstOrDefault(log => log.Provider == provider && log.EventId == eventId);
+    public void AddWebhookEventLog(WebhookEventLog webhookEventLog) => _webhookEventLogs.Add(webhookEventLog);
+    public void UpdateWebhookEventLog(WebhookEventLog webhookEventLog) { }
 }

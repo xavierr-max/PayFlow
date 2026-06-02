@@ -17,8 +17,8 @@ public class Category : Entity
         Color = color.Trim();
     }
 
-    public string Name { get; private set; }
-    public string Color { get; private set; }
+    public string Name { get; private set; } = string.Empty;
+    public string Color { get; private set; } = string.Empty;
 
     public void Update(string name, string color)
     {
